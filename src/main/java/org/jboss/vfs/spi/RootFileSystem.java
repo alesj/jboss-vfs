@@ -22,25 +22,23 @@
 
 package org.jboss.vfs.spi;
 
-import org.jboss.vfs.VirtualFile;
 import org.jboss.logging.Logger;
+import org.jboss.vfs.VirtualFile;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.FileInputStream;
-import java.security.CodeSigner;
-import java.util.List;
-import java.util.Arrays;
-import java.util.Collections;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * A special FileSystem which supports multiple roots.
  * 
  * This is currently accomplished by requiring that VirtualFile.getPathName()
  * produce output that is consumable by java.io.File as a path.
+ *
+ * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
+ * @author <a href="ales.justin@jboss.org">Ales Justin</a>
  */
-public final class RootFileSystem implements FileSystem {
+public final class RootFileSystem extends AbstractFileSystem {
 
     private static final Logger log = Logger.getLogger("org.jboss.vfs.root");
     
@@ -48,94 +46,14 @@ public final class RootFileSystem implements FileSystem {
     
     private RootFileSystem(){}
 
-    /**
-     * {@inheritDoc}
-     */
-    public InputStream openInputStream(VirtualFile mountPoint, VirtualFile target) throws IOException {
-        return new FileInputStream(getFile(mountPoint, target));
+    protected Path getPath(VirtualFile mountPoint, VirtualFile target) {
+        return Paths.get(target.getPathName());
     }
-
-    /**
-     * {@inheritDoc}
-     */
-    public boolean isReadOnly() {
-        return false;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public File getFile(VirtualFile mountPoint, VirtualFile target) {
-        return new File(target.getPathName());
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public boolean delete(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).delete();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public long getSize(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).length();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public long getLastModified(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).lastModified();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public boolean exists(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).exists();
-    }
-
-    /** {@inheritDoc} */
-    public boolean isFile(final VirtualFile mountPoint, final VirtualFile target) {
-        return getFile(mountPoint, target).isFile();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public boolean isDirectory(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).isDirectory();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public List<String> getDirectoryEntries(VirtualFile mountPoint, VirtualFile target) {
-        final String[] names = getFile(mountPoint, target).list();
-        return names == null ? Collections.<String>emptyList() : Arrays.asList(names);
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public CodeSigner[] getCodeSigners(VirtualFile mountPoint, VirtualFile target) {
-        return null;
-    }
-
 
     /**
      * {@inheritDoc}
      */
     public File getMountSource() {
         return null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void close() throws IOException {
-        // no operation - the root FS can't be closed
     }
 }

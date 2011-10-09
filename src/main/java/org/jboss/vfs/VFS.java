@@ -21,6 +21,15 @@
 */
 package org.jboss.vfs;
 
+import org.jboss.logging.Logger;
+import org.jboss.vfs.spi.AssemblyFileSystem;
+import org.jboss.vfs.spi.FileSystem;
+import org.jboss.vfs.spi.JavaZipFileSystem;
+import org.jboss.vfs.spi.MountHandle;
+import org.jboss.vfs.spi.RealFileSystem;
+import org.jboss.vfs.spi.RootFileSystem;
+import org.jboss.vfs.spi.ZipNioFileSystem;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -41,14 +50,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.jboss.logging.Logger;
-import org.jboss.vfs.spi.AssemblyFileSystem;
-import org.jboss.vfs.spi.FileSystem;
-import org.jboss.vfs.spi.JavaZipFileSystem;
-import org.jboss.vfs.spi.MountHandle;
-import org.jboss.vfs.spi.RealFileSystem;
-import org.jboss.vfs.spi.RootFileSystem;
 
 /**
  * Virtual File System
@@ -384,6 +385,28 @@ public class VFS {
             if (!ok) {
                 VFSUtils.safeClose(tempDir);
             }
+        }
+    }
+
+    /**
+     * Create and mount a zip file into the filesystem, returning a single handle which will unmount and close the file
+     * system when closed.
+     *
+     * @param zipFile the zip file to mount
+     * @param mountPoint the point at which the filesystem should be mounted
+     *
+     * @return a handle
+     *
+     * @throws IOException if an error occurs
+     */
+    public static Closeable mountZip(File zipFile, VirtualFile mountPoint) throws IOException {
+        ZipNioFileSystem fileSystem = new ZipNioFileSystem(zipFile);
+        try {
+            Closeable mount = mount(mountPoint, fileSystem);
+            return new BasicMountHandle(fileSystem, mount);
+        } catch (IOException e) {
+            fileSystem.close();
+            throw e;
         }
     }
 

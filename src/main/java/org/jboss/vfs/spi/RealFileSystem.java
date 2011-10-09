@@ -22,35 +22,27 @@
 
 package org.jboss.vfs.spi;
 
-import org.jboss.vfs.VirtualFile;
 import org.jboss.logging.Logger;
+import org.jboss.vfs.VirtualFile;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.FileInputStream;
-import java.security.CodeSigner;
-import java.util.List;
-import java.util.Arrays;
-import java.util.Collections;
+import java.nio.file.Path;
 
 /**
  * A real filesystem.
  *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
+ * @author <a href="ales.justin@jboss.org">Ales Justin</a>
  */
-public final class RealFileSystem implements FileSystem {
+public final class RealFileSystem extends AbstractFileSystem {
 
     private static final Logger log = Logger.getLogger("org.jboss.vfs.real");
 
     /**
      * The root real filesystem (singleton instance).
      */
-   
 
-    private static final boolean NEEDS_CONVERSION = File.separatorChar != '/';
-
-    private final File realRoot;
+    private final Path realRoot;
 
     /**
      * Construct a real filesystem with the given real root.
@@ -58,103 +50,31 @@ public final class RealFileSystem implements FileSystem {
      * @param realRoot the real root
      */
     public RealFileSystem(File realRoot) {
-        this.realRoot = realRoot;
+        this.realRoot = realRoot.toPath();
         log.tracef("Constructed real filesystem at root %s", realRoot);
     }
 
     /**
-     * {@inheritDoc}
+     * Get path.
+     *
+     * @param mountPoint the mount point
+     * @param target the target
+     * @return path instance
      */
-    public InputStream openInputStream(VirtualFile mountPoint, VirtualFile target) throws IOException {
-        return new FileInputStream(getFile(mountPoint, target));
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public boolean isReadOnly() {
-        return false;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public File getFile(VirtualFile mountPoint, VirtualFile target) {
+    protected Path getPath(VirtualFile mountPoint, VirtualFile target) {
         if (mountPoint.equals(target)) {
             return realRoot;
         } else if (NEEDS_CONVERSION) {
-            return new File(realRoot, target.getPathNameRelativeTo(mountPoint).replace('/', File.separatorChar));
+            return realRoot.resolve(target.getPathNameRelativeTo(mountPoint).replace('/', File.separatorChar));
         } else {
-            return new File(realRoot, target.getPathNameRelativeTo(mountPoint));
+            return realRoot.resolve(target.getPathNameRelativeTo(mountPoint));
         }
     }
 
     /**
      * {@inheritDoc}
      */
-    public boolean delete(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).delete();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public long getSize(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).length();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public long getLastModified(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).lastModified();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public boolean exists(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).exists();
-    }
-
-    /** {@inheritDoc} */
-    public boolean isFile(final VirtualFile mountPoint, final VirtualFile target) {
-        return getFile(mountPoint, target).isFile();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public boolean isDirectory(VirtualFile mountPoint, VirtualFile target) {
-        return getFile(mountPoint, target).isDirectory();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public List<String> getDirectoryEntries(VirtualFile mountPoint, VirtualFile target) {
-        final String[] names = getFile(mountPoint, target).list();
-        return names == null ? Collections.<String>emptyList() : Arrays.asList(names);
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public CodeSigner[] getCodeSigners(VirtualFile mountPoint, VirtualFile target) {
-        return null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public File getMountSource() {
-        return realRoot;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void close() throws IOException {
-        // no operation - the real FS can't be closed
+        return realRoot.toFile();
     }
 }
