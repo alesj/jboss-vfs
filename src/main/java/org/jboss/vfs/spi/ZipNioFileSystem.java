@@ -37,8 +37,8 @@ import java.security.CodeSigner;
  * @author <a href="mailto:ales.justin@jboss.org">Ales Justin</a>
  */
 public class ZipNioFileSystem extends AbstractFileSystem {
-    private Path archivePath;
-    private volatile java.nio.file.FileSystem zipfs;
+    private final Path archivePath;
+    private final java.nio.file.FileSystem zipfs;
 
     public ZipNioFileSystem(File archiveFile) throws IOException {
         this.archivePath = archiveFile.toPath();
