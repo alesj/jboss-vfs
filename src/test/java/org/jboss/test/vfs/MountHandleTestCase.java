@@ -27,6 +27,7 @@ import org.jboss.vfs.VirtualFile;
 
 import java.io.Closeable;
 import java.io.File;
+import java.util.List;
 
 /**
  * Tests functionality of the MountHandle retrieving mount source.
@@ -35,33 +36,53 @@ import java.io.File;
  */
 public class MountHandleTestCase extends AbstractVFSTest {
 
-   public MountHandleTestCase(final String name) {
-      super(name);
-   }
+    public MountHandleTestCase(final String name) {
+        super(name);
+    }
 
-   public void testZipGetMountSource() throws Exception {
-      VirtualFile jar  = getVirtualFile("/vfs/test/jar1.jar");
-      File origin = jar.getPhysicalFile();
-      Closeable mountHandle = VFS.mountZip(jar, jar, provider);
-      try
-      {
-         File mounted = jar.getPhysicalFile();
-         File source = VFSUtils.getMountSource(mountHandle);
+    public void testZipGetMountSource() throws Exception {
+        VirtualFile jar = getVirtualFile("/vfs/test/jar1.jar");
+        File origin = jar.getPhysicalFile();
+        Closeable mountHandle = VFS.mountZip(jar, jar, provider);
+        try {
+            File mounted = jar.getPhysicalFile();
+            File source = VFSUtils.getMountSource(mountHandle);
 
-         assertNotNull(origin);
-         assertNotNull(mounted);
-         assertNotNull(source);
-         assertFalse(origin.equals(mounted));
-         assertFalse(origin.equals(source));
-         assertFalse(mounted.equals(source));
+            assertNotNull(origin);
+            assertNotNull(mounted);
+            assertNotNull(source);
+            assertFalse(origin.equals(mounted));
+            assertFalse(origin.equals(source));
+            assertFalse(mounted.equals(source));
 
-         assertTrue(origin.isFile());
-         assertTrue(source.isFile());
-         assertTrue(mounted.isDirectory());
+            assertTrue(origin.isFile());
+            assertTrue(source.isFile());
+            assertTrue(mounted.isDirectory());
 
-         assertEquals(origin.length(), source.length());
-      } finally {
-         VFSUtils.safeClose(mountHandle);
-      }
-   }
+            assertEquals(origin.length(), source.length());
+        } finally {
+            VFSUtils.safeClose(mountHandle);
+        }
+    }
+
+    public void testNewZipMount() throws Exception {
+        VirtualFile jar = getVirtualFile("/vfs/test/jar1.jar");
+        File origin = jar.getPhysicalFile();
+        Closeable mountHandle = VFS.mountZip(origin, jar);
+        try {
+            VirtualFile dir = jar.getChild("org/jboss/test/vfs/support/jar1");
+            assertTrue(dir.isDirectory());
+
+            List<VirtualFile> children = dir.getChildren();
+            assertFalse(children.isEmpty());
+
+            VirtualFile file = dir.getChild("ClassInJar1.class");
+            assertNotNull(file);
+            assertTrue(file.exists());
+            assertTrue(file.isFile());
+            assertTrue(file.getSize() > 0);
+        } finally {
+            mountHandle.close();
+        }
+    }
 }

@@ -59,6 +59,12 @@ public class ZipNioFileSystem extends AbstractFileSystem {
     }
 
     @Override
+    public File getFile(VirtualFile mountPoint, VirtualFile target) {
+        // TODO -- copy externally?
+        throw new UnsupportedOperationException("No File for Zip entry.");
+    }
+
+    @Override
     public boolean isReadOnly() {
         return true;
     }

@@ -22,17 +22,18 @@
 
 package org.jboss.vfs.spi;
 
+import org.jboss.vfs.VFSUtils;
 import org.jboss.vfs.VirtualFile;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.CodeSigner;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -146,10 +147,21 @@ public abstract class AbstractFileSystem implements FileSystem {
      * {@inheritDoc}
      */
     public List<String> getDirectoryEntries(VirtualFile mountPoint, VirtualFile target) {
-        final String[] names = getFile(mountPoint, target).list(); // nicer code than file.nio dir stream
-        return names == null ? Collections.<String>emptyList() : Arrays.asList(names);
+        DirectoryStream<Path> stream = null;
+        try {
+            Path path = getPath(mountPoint, target);
+            List<String> files = new ArrayList<String>();
+            stream = Files.newDirectoryStream(path);
+            for (Path p : stream)
+                files.add(p.getFileName().toString());
+            return files;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } finally {
+            VFSUtils.safeClose(stream);
+        }
     }
-    
+
     /**
      * {@inheritDoc}
      */
