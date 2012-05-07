@@ -22,12 +22,11 @@
 
 package org.jboss.vfs.spi;
 
-import org.jboss.logging.Logger;
-import org.jboss.vfs.VirtualFile;
-
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
+import org.jboss.vfs.VirtualFile;
 
 /**
  * A special FileSystem which supports multiple roots.
@@ -40,8 +39,6 @@ import java.nio.file.Paths;
  */
 public final class RootFileSystem extends AbstractFileSystem {
 
-    private static final Logger log = Logger.getLogger("org.jboss.vfs.root");
-    
     public static final RootFileSystem ROOT_INSTANCE = new RootFileSystem();
     
     private RootFileSystem(){}

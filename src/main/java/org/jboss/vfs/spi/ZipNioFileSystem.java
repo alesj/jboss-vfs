@@ -22,14 +22,14 @@
 
 package org.jboss.vfs.spi;
 
-import org.jboss.vfs.VFSUtils;
-import org.jboss.vfs.VirtualFile;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.security.CodeSigner;
+
+import org.jboss.vfs.VFSUtils;
+import org.jboss.vfs.VirtualFile;
 
 /**
  * Zip file system based on new NIO fs.
@@ -46,11 +46,10 @@ public class ZipNioFileSystem extends AbstractFileSystem {
     }
 
     protected Path getPath(VirtualFile mountPoint, VirtualFile target) {
-        if (mountPoint.equals(target))
-            return archivePath;
-
         String relativePath;
-        if (NEEDS_CONVERSION) {
+        if (mountPoint.equals(target)) {
+            relativePath = "/";
+        } else if (NEEDS_CONVERSION) {
             relativePath = target.getPathNameRelativeTo(mountPoint).replace('/', File.separatorChar);
         } else {
             relativePath = target.getPathNameRelativeTo(mountPoint);
