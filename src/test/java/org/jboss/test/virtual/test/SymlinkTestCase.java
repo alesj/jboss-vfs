@@ -166,6 +166,19 @@ public class SymlinkTestCase extends AbstractVFSTest
       }
    }
 
+   public void testJarFileScheme() throws Exception
+   {
+      URL url = getResource("/vfs/test/level1.zip");
+      try
+      {
+        VFS vfs = VFS.getVFS(new URL("jar:file:" + url.getPath() + "!/" + "level2.zip/level3.zip"));
+      }
+      catch(NullPointerException npe)
+      {
+        failure("NPE thrown because jar:file: not handled by canonicalization code.", npe);
+      }
+   }
+
    protected void assertCopies(TrackingTempStore store)
    {
       int counter = 0;
