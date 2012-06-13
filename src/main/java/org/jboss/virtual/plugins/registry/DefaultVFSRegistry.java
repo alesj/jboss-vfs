@@ -108,7 +108,7 @@ public class DefaultVFSRegistry extends VFSRegistry
    {
       if (forceCanonical)
       {
-         String path = new File(VFSUtils.getPath(uri)).getCanonicalPath();
+         String path = new File(VFSUtils.stripProtocol(uri)).getCanonicalPath();
          try
          {
             return new URI(uri.getScheme(), uri.getHost(), path, uri.getQuery(), uri.getFragment());
