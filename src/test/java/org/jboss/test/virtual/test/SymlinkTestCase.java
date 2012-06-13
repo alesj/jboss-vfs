@@ -21,12 +21,7 @@
 */
 package org.jboss.test.virtual.test;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Collections;
@@ -232,17 +227,6 @@ public class SymlinkTestCase extends AbstractVFSTest
          VFSCacheFactory.setInstance(null);
          cache.stop();
       }
-   }
-
-   protected void assertCopies(TrackingTempStore store, String name)
-   {
-      int counter = 0;
-      for (File file : store.getFiles())
-      {
-         if (file.getName().contains(name))
-            counter++;
-      }
-      assertEquals("Test files == 1", 1, counter);
    }
 
    protected void assertCopies(TrackingTempStore store)
