@@ -481,6 +481,10 @@ public abstract class AbstractVFSContext implements VFSContext
       // entry is found. Alternatively, path could be broken up by the separation delimiter,
       // and each lookup done from there.
       Entry<TempInfoKey, TempInfo> floor = tempInfos.floorEntry(TempInfoKey.last(path));
+      while(floor != null && path.startsWith(floor.getKey().originalPath) == false)
+      {
+         floor = tempInfos.lowerEntry(floor.getKey());
+      }
       TempInfo result = null;
       while (floor != null && path.startsWith(floor.getKey().originalPath))
       {
