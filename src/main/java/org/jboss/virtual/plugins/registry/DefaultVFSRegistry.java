@@ -39,6 +39,8 @@ import java.net.URISyntaxException;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 
 /**
@@ -50,13 +52,16 @@ public class DefaultVFSRegistry extends VFSRegistry
 {
    /** Do we force canonical lookup */
    private static boolean forceCanonical;
+   private static Logger log = Logger.getLogger(DefaultVFSRegistry.class);
+
+   private Map<String,String> pathAliases = new HashMap<String,String>();
 
    static
    {
       forceCanonical = AccessController.doPrivileged(new CheckForceCanonical());
 
       if (forceCanonical)
-         Logger.getLogger(DefaultVFSRegistry.class).info("VFS force canonical lookup is enabled.");
+         log.info("VFS force canonical lookup is enabled.");
    }
 
    /**
@@ -98,20 +103,92 @@ public class DefaultVFSRegistry extends VFSRegistry
    }
 
    /**
-    * Canonicalize uri.
+    * Retrieve a VFSContext and canonicalized URI if jboss.vfs.forceCanonical is enabled.
+    * Walk backward up the path canonicalizing until we find something
+    * that is in permanentRoots.  This is essentially a way to figure out
+    * what the original path was for the permanentRoot before it got mangled
+    * by the URLEditor.
     *
-    * @param uri the uri
-    * @return canonical uri
-    * @throws IOException for any IO error
+    * @param uri the uri to resolve
+    * @return If jboss.vfs.forceCanonical is true, a uri with its first part replaced
+    * with a permanent root if possible along with its VFSContext if possible.
+    * If jboss.vfs.forceCanonical=false, just try to find the VFSContext without
+    * canonicalizing the original URI and return both.
+    * @throws IOException for any IO or URI error.
     */
-   protected static URI canonicalize(URI uri) throws IOException
+   protected URIResolutionResult resolveURI(URI uri) throws IOException
    {
-      if (forceCanonical)
+      //first just try to find it
+      VFSContext ctx = getCache().findContext(uri);
+      if(ctx != null)
       {
-         String path = new File(uri.getPath()).getCanonicalPath();
+         if(log.isTraceEnabled())
+            log.trace("Context found immediately for: " + uri.toString() + " -> " + ctx.toString());
+
+         return new URIResolutionResult(ctx, uri);
+      }
+
+      if(forceCanonical)
+      {
+         String path = VFSUtils.stripProtocol(uri);
+
+         //we weren't lucky.. check to see if we've already done the walking routine to figure out
+         //the permanent root.  If we have, build a URI with the permanent root and the relative path
+         //of the original URI minus whatever symlink infested stuff it had as parents.
+         File file = new File(path);
          try
          {
-            return new URI(uri.getScheme(), uri.getHost(), path, uri.getQuery(), uri.getFragment());
+            URI fixedURI = null;
+            for(String key: pathAliases.keySet())
+            {
+               if(path.startsWith(key))
+               {
+                  String relative = path.substring(key.length());
+
+                  String alias = pathAliases.get(key);
+                  fixedURI = new URI(uri.getScheme(), uri.getHost(),  alias + relative, uri.getQuery(), uri.getFragment());
+
+                  if(log.isTraceEnabled())
+                     log.trace("Found aliased context: " + key + " -> " + pathAliases.get(key));
+
+                  return new URIResolutionResult(getCache().findContext(fixedURI), fixedURI);
+               }
+            }
+
+            //it wasn't aliased, so try to figure out if a corresponding permanentRoot exists
+            String relative = "";
+            while(ctx == null && file != null)
+            {
+               URI toFind = new URI(uri.getScheme(), uri.getHost(), file.getCanonicalPath(), uri.getQuery(), uri.getFragment());
+
+               if(log.isTraceEnabled())
+                  log.trace("Trying to find in permanentRoots: " + toFind.toString());
+
+               ctx = getCache().findContext(toFind);
+               if(ctx == null)
+               {
+                  if(relative.length() == 0)
+                  {
+                     relative=file.getName();
+                  }
+                  else
+                  {
+                     relative = file.getName() + "/" + relative;
+                  }
+                  file = file.getParentFile();
+               }
+            }
+
+            //we found one, so store it for later
+            if(ctx != null)
+            {
+               if(log.isTraceEnabled())
+                  log.trace("Found: " + file.getCanonicalPath());
+
+               pathAliases.put(file.getPath(),file.getCanonicalPath());
+               fixedURI = new URI(uri.getScheme(), uri.getHost(), file.getCanonicalPath() + "/" + relative, uri.getQuery(), uri.getFragment());
+               return new URIResolutionResult(getCache().findContext(fixedURI), fixedURI);
+            }
          }
          catch (URISyntaxException e)
          {
@@ -119,8 +196,10 @@ public class DefaultVFSRegistry extends VFSRegistry
             ioe.initCause(e);
             throw ioe;
          }
+
       }
-      return uri;
+      //we did all we could - let it fall through with the original URI
+      return new URIResolutionResult(null, uri);
    }
 
    public VFSContext getContext(URI uri) throws IOException
@@ -128,11 +207,15 @@ public class DefaultVFSRegistry extends VFSRegistry
       if (uri == null)
          throw new IllegalArgumentException("Null uri");
 
-      uri = canonicalize(uri);
-      VFSContext context = getCache().findContext(uri);
+      URIResolutionResult resolutionResult = resolveURI(uri);
+
+      if(log.isTraceEnabled())
+         log.trace("Getting context in getContext(): " + resolutionResult.getURI().toString());
+
+      VFSContext context = resolutionResult.getContext();
       if (context != null)
       {
-         String relativePath = VFSUtils.getRelativePath(context, uri);
+         String relativePath = VFSUtils.getRelativePath(context, resolutionResult.getURI());
          if (relativePath.length() == 0)
             return context;
       }
@@ -144,11 +227,15 @@ public class DefaultVFSRegistry extends VFSRegistry
       if (uri == null)
          throw new IllegalArgumentException("Null uri");
 
-      uri = canonicalize(uri);
-      VFSContext context = getCache().findContext(uri);
+      URIResolutionResult resolutionResult = resolveURI(uri);
+
+      if(log.isTraceEnabled())
+         log.trace("Getting context in getFile(): " + resolutionResult.getURI().toString());
+
+      VFSContext context = resolutionResult.getContext();
       if (context != null)
       {
-         String relativePath = VFSUtils.getRelativePath(context, uri);
+         String relativePath = VFSUtils.getRelativePath(context, resolutionResult.getURI());
 
          TempInfo ti = context.getFurthestParentTemp(relativePath);
          if (ti != null)
@@ -198,4 +285,27 @@ public class DefaultVFSRegistry extends VFSRegistry
          return Boolean.valueOf(forceString);
       }
    }
+
+   private static class URIResolutionResult
+   {
+      private VFSContext context;
+      private URI uri;
+
+      public URIResolutionResult(final VFSContext context, final URI uri)
+      {
+         this.context = context;
+         this.uri = uri;
+      }
+
+      public VFSContext getContext()
+      {
+         return this.context;
+      }
+
+      public URI getURI()
+      {
+         return this.uri;
+      }
+   }
+
 }

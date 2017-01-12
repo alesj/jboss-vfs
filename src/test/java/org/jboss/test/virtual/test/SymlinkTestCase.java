@@ -38,6 +38,7 @@ import org.jboss.virtual.VirtualFile;
 import org.jboss.virtual.plugins.cache.CombinedVFSCache;
 import org.jboss.virtual.plugins.copy.TrackingTempStore;
 import org.jboss.virtual.spi.ExceptionHandler;
+import org.jboss.virtual.spi.VFSContext;
 import org.jboss.virtual.spi.cache.VFSCache;
 import org.jboss.virtual.spi.cache.VFSCacheFactory;
 import org.jboss.virtual.spi.cache.helpers.NoopVFSCache;
@@ -55,7 +56,7 @@ public class SymlinkTestCase extends AbstractVFSTest
 
    public SymlinkTestCase(String name)
    {
-      super(name);
+      super(name, true);
    }
 
    public static Test suite()
@@ -83,7 +84,8 @@ public class SymlinkTestCase extends AbstractVFSTest
       // setup symlink dir and test path!
 
 //      System.setProperty("test.dir", "/Users/alesj/projects/jboss6/trunk"); // plain path
-      System.setProperty("test.dir", "/Users/alesj/jboss"); // -- this is symlink
+//      System.setProperty("test.dir", "/Users/alesj/jboss"); // -- this is symlink
+      System.setProperty("test.dir", "/home/csams/tmp/sym_deploy"); // -- this is symlink
 
       testPath = "/testsuite/output/lib/jboss-seam-booking.ear/jboss-seam.jar/org/jboss/seam/Seam.class";
       testName = "jboss-seam.jar";
@@ -100,34 +102,67 @@ public class SymlinkTestCase extends AbstractVFSTest
       super.tearDown();
    }
 
+   /*
+    * /home/csams/tmp/sym_deploy -> /home/csams/tmp/deploy
+    * /home/csams/tmp/deploy/deploy -> /home/csams/tmp/another_dir
+    */
    public void testAppAsLink() throws Exception
    {
       if (supportSymlinks() == false)
          return;
 
+      String resourceName="vfszip:///home/csams/tmp/sym_deploy/deploy/data.jar/empty.txt";
+
       URLEditor editor = new URLEditor();
-      // this is now a symlink, pointing to where app.jar is
-      // where app.jar is again a symlink
-      editor.setAsText("/Users/alesj/temp/otherln");
+      editor.setAsText("file:/home/csams/tmp/sym_deploy");
+
+      //this should resolve as file:/home/csams/tmp/deploy
       URL dir = (URL) editor.getValue();
 
       CombinedVFSCache cache = new CombinedVFSCache();
       VFSCacheFactory.setInstance(cache);
-      cache.setPermanentRoots(Collections.<URL, ExceptionHandler>singletonMap(dir, null));
+      VFSCache realCache = new NoopVFSCache();
+      realCache.start();
+      cache.setRealCache(realCache);
 
-      VirtualFile root = VFS.getRoot(dir);
-      VirtualFile app = root.getChild("app.jar");
-      VirtualFile clazz = app.getChild("org/jboss/test/vfs/support/CommonClass.class");
-      Assert.assertNotNull(clazz);
-      URL url = clazz.toURL();
+      try
+      {
+        cache.setPermanentRoots(Collections.<URL, ExceptionHandler>singletonMap(dir, null));
+        cache.start();
+        
+        URL sub = new URL(resourceName);
+        VFS dirVFS = VFS.getVFS(dir);
 
-      VirtualFile vf1 = VFS.getRoot(url);
-      Assert.assertNotNull(vf1);
-      VirtualFile vf2 = VFS.getRoot(url);
-      Assert.assertNotNull(vf2);
+        VirtualFile rootFile = VFS.getRoot(dir);
+        System.out.println(rootFile);
+
+        VirtualFile subFile1 = VFS.getRoot(sub);
+        System.out.println(subFile1);
+
+        VirtualFile subFile2 = VFS.getRoot(sub);
+        System.out.println(subFile2);
+
+        //they should have parents, and those parents' VFSContexts should be the one stored as permanentRoot
+        assertNotNull(subFile1.getParent());
+        assertNotNull(subFile2.getParent());
+
+        //the parent VFSContext of the ZipEntryContext should be the VFSContext of the permanentRoot
+        assertEquals(rootFile.getVFS(), dirVFS);
+        assertEquals(rootFile.getVFS(), subFile1.getParent().getVFS());
+        assertEquals(rootFile.getVFS(), subFile2.getParent().getVFS());
+
+        //the VFSContexts also should be the same
+        assertEquals(subFile1.getVFS(), subFile2.getVFS());
+      }
+      finally
+      {
+         VFSCacheFactory.setInstance(null);
+         if(cache != null)
+           cache.stop();
+      }
    }
 
-   public void testCacheUsage() throws Exception
+   public void xtestCacheUsage() throws Exception
    {
       if (supportSymlinks() == false)
          return;
